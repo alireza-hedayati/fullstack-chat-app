@@ -271,8 +271,21 @@ export default function ChatPage() {
       {/* Top Application Bar */}
       <header className="h-14 border-b border-[#202734]/10 px-4 sm:px-6 flex items-center justify-between bg-white/70 backdrop-blur-md shrink-0 z-20">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-[#5D866C] flex items-center justify-center font-bold text-[11px] text-[#F5F5F0] shadow-xs">
-            DM
+          <div className="w-6 h-6 rounded-md bg-[#5D866C] flex items-center justify-center text-[#F5F5F0] shadow-xs shrink-0">
+            <svg
+              className="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <path d="M8 9h8" />
+              <path d="M8 13h5" />
+            </svg>
           </div>
           <span className="font-semibold text-sm text-[#202734] tracking-tight">DM Messenger</span>
         </div>

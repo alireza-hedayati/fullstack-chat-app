@@ -46,9 +46,22 @@ export default function LoginPage() {
       <div className="w-full max-w-[380px] bg-white border border-[#202734]/10 rounded-2xl p-8 shadow-[0_2px_12px_rgba(32,39,52,0.04)]">
         {/* Brand identity header */}
         <div className="mb-7">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-md bg-[#5D866C] flex items-center justify-center font-bold text-xs text-[#F5F5F0] tracking-tight shadow-sm shadow-[#5D866C]/20">
-              DM
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-7 h-7 rounded-md bg-[#5D866C] flex items-center justify-center text-[#F5F5F0] shadow-sm shadow-[#5D866C]/20 shrink-0">
+              <svg
+                className="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <path d="M8 9h8" />
+                <path d="M8 13h5" />
+              </svg>
             </div>
             <span className="text-sm font-semibold tracking-tight text-[#202734]">DM Messenger</span>
             <span className="inline-flex items-center gap-1.5 ml-auto text-[11px] text-[#202734]/60 font-mono">
