@@ -14,6 +14,14 @@ interface SocketData {
   user: SocketUser;
 }
 
+let ioInstance: Server | null = null;
+
+export function disconnectUserSockets(userId: number): void {
+  if (ioInstance) {
+    ioInstance.in(`user:${userId}`).disconnectSockets(true);
+  }
+}
+
 export function initSocketServer(httpServer: http.Server, clientUrl: string): Server {
   const io = new Server(httpServer, {
     cors: {
@@ -21,6 +29,8 @@ export function initSocketServer(httpServer: http.Server, clientUrl: string): Se
       credentials: true,
     },
   });
+
+  ioInstance = io;
 
   // JWT Handshake Authentication Middleware
   io.use((socket: Socket, next) => {

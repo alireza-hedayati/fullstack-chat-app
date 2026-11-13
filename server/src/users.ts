@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { requireAuth, toUserProfile } from './auth';
 import { db } from './db';
 import { UserProfile } from './types';
+import { disconnectUserSockets } from './sockets';
 
 interface UserRow {
   id: number;
@@ -70,6 +72,45 @@ usersRouter.patch('/me', requireAuth, (req: Request, res: Response): void => {
 
   const profile: UserProfile = toUserProfile(updated);
   res.status(200).json(profile);
+});
+
+usersRouter.delete('/me', requireAuth, (req: Request, res: Response): void => {
+  const { password } = req.body ?? {};
+
+  if (!password || typeof password !== 'string') {
+    res.status(401).json({ error: 'Invalid password' });
+    return;
+  }
+
+  const user = db
+    .prepare('SELECT id, password_hash FROM users WHERE id = ?')
+    .get(req.user!.id) as { id: number; password_hash: string } | undefined;
+
+  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    res.status(401).json({ error: 'Invalid password' });
+    return;
+  }
+
+  // Atomically anonymize user in a single transaction
+  const anonymize = db.transaction((userId: number) => {
+    db.prepare(`
+      UPDATE users
+      SET username = 'deleted#' || id,
+          first_name = '',
+          last_name = '',
+          bio = '',
+          password_hash = '',
+          deleted_at = datetime('now')
+      WHERE id = ?
+    `).run(userId);
+  });
+
+  anonymize(req.user!.id);
+
+  // Force disconnect all open sockets for this user
+  disconnectUserSockets(req.user!.id);
+
+  res.status(204).send();
 });
 
 usersRouter.get('/users', requireAuth, (req: Request, res: Response): void => {

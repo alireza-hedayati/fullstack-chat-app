@@ -30,6 +30,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers,
   });
 
+  // Handle 204 No Content
+  if (response.status === 204) {
+    return undefined as unknown as T;
+  }
+
   let data: any = null;
   const contentType = response.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {
@@ -78,6 +83,13 @@ export const api = {
     return request<UserProfile>('/api/me', {
       method: 'PATCH',
       body: JSON.stringify(profile),
+    });
+  },
+
+  deleteAccount(password: string): Promise<void> {
+    return request<void>('/api/me', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
     });
   },
 

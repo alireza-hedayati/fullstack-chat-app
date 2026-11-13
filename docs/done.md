@@ -10,6 +10,10 @@ Append-only. One entry per finished feature, newest at the top. Format:
 
 ---
 
+## 2026-11-13 — F5 Delete account
+- Server: implemented `DELETE /api/me` with password verification, single atomic SQLite transaction anonymizing account (`deleted_at = datetime('now')`, `username = 'deleted#' || id`, profile fields blanked, `password_hash = ''`), force disconnection of active sockets in `user:<id>`, and rejection of message sending to conversations with deleted peers.
+- Client: added Danger Zone on `/profile` with password confirmation modal dialog; cleared local authentication, disconnected socket, and redirected to `/login` upon deletion; styled deleted peers in `/chat` as "Deleted User" with gray initials avatar (`DU`) and disabled message input.
+
 ## 2026-11-13 — F4 Realtime messaging
 - Server: implemented `sockets.ts` with JWT handshake authentication, personal `user:<id>` room routing, `message:send` with database insertion, ack feedback, and `message:new` dual-room broadcast; added `GET /api/conversations/:id/messages` returning last 50 messages for authorized participants.
 - Client: built `lib/socket.ts` client singleton with auto-reconnection and authentication error management; built live message thread in `/chat` with auto-scroll, message bubbles, timestamps, send form with ack handling, and dynamic sidebar reordering on incoming messages.
