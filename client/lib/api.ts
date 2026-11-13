@@ -69,4 +69,15 @@ export const api = {
   getMe(): Promise<UserProfile> {
     return request<UserProfile>('/api/me');
   },
+
+  updateProfile(profile: {
+    first_name?: string;
+    last_name?: string;
+    bio?: string;
+  }): Promise<UserProfile> {
+    return request<UserProfile>('/api/me', {
+      method: 'PATCH',
+      body: JSON.stringify(profile),
+    });
+  },
 };

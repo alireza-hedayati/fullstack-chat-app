@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { clearAuth, getUser, isAuthenticated, setAuth } from '@/lib/auth';
 import { UserProfile } from '@/lib/types';
+import { Avatar } from '@/components/Avatar';
+import { getDisplayName } from '@/lib/display';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -55,11 +58,7 @@ export default function ChatPage() {
     );
   }
 
-  const initials = user?.username ? user.username.slice(0, 2).toUpperCase() : 'DM';
-  const displayName =
-    user?.first_name || user?.last_name
-      ? `${user.first_name} ${user.last_name}`.trim()
-      : user?.username;
+  const displayName = user ? getDisplayName(user) : 'User';
 
   return (
     <div className="min-h-screen bg-[#F5F5F0] text-[#202734] flex flex-col">
@@ -73,12 +72,23 @@ export default function ChatPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 pl-3 py-1 pr-1.5 rounded-full bg-white border border-[#202734]/10 shadow-2xs">
-            <span className="text-xs text-[#202734] font-medium">@{user?.username}</span>
-            <div className="w-6 h-6 rounded-full bg-[#5D866C]/15 text-[#5D866C] font-semibold text-[11px] flex items-center justify-center border border-[#5D866C]/25">
-              {initials}
-            </div>
-          </div>
+          <Link
+            href="/profile"
+            className="flex items-center gap-2 pl-3 py-1 pr-1.5 rounded-full bg-white border border-[#202734]/10 hover:border-[#5D866C]/40 transition shadow-2xs group"
+          >
+            <span className="text-xs text-[#202734] font-medium group-hover:text-[#5D866C] transition-colors">
+              {displayName}
+            </span>
+            {user && <Avatar user={user} size="sm" />}
+          </Link>
+
+          <Link
+            href="/profile"
+            className="text-xs text-[#202734]/70 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition font-medium"
+          >
+            Profile
+          </Link>
+
           <button
             onClick={handleLogout}
             className="text-xs text-[#202734]/60 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition"
@@ -91,20 +101,32 @@ export default function ChatPage() {
       {/* Main Container */}
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm bg-white border border-[#202734]/10 rounded-2xl p-8 text-center shadow-[0_2px_12px_rgba(32,39,52,0.04)]">
-          <div className="w-14 h-14 rounded-2xl bg-[#5D866C]/12 border border-[#5D866C]/20 text-[#5D866C] font-semibold text-lg flex items-center justify-center mx-auto mb-4">
-            {initials}
-          </div>
+          {user && <Avatar user={user} size="xl" className="mx-auto mb-4" />}
           <h2 className="text-lg font-semibold text-[#202734] tracking-tight">
             Signed in as {displayName}
           </h2>
-          <p className="text-xs text-[#202734]/60 mt-1 max-w-xs mx-auto leading-relaxed">
-            Your credentials and session are verified. Realtime conversations and profiles unlock in the next steps.
+          <p className="text-xs text-[#202734]/60 mt-0.5 font-mono">@{user?.username}</p>
+
+          {user?.bio && (
+            <p className="text-xs text-[#202734]/80 mt-3 px-3 py-2 bg-[#F5F5F0]/60 rounded-lg border border-[#202734]/10 leading-relaxed italic">
+              &ldquo;{user.bio}&rdquo;
+            </p>
+          )}
+
+          <p className="text-xs text-[#202734]/60 mt-4 leading-relaxed">
+            Your credentials and session are verified. Realtime conversations and instant chat unlock in F3/F4.
           </p>
 
-          <div className="mt-6 pt-6 border-t border-[#202734]/10">
+          <div className="mt-6 pt-6 border-t border-[#202734]/10 flex flex-col gap-2">
+            <Link
+              href="/profile"
+              className="w-full py-2 px-4 text-xs font-medium text-[#F5F5F0] bg-[#5D866C] hover:bg-[#4d705a] rounded-lg transition text-center shadow-xs"
+            >
+              Edit profile
+            </Link>
             <button
               onClick={handleLogout}
-              className="w-full px-4 py-2 text-xs font-medium text-[#202734] hover:bg-[#F5F5F0] bg-white border border-[#202734]/15 rounded-lg transition"
+              className="w-full py-2 px-4 text-xs font-medium text-[#202734] hover:bg-[#F5F5F0] bg-white border border-[#202734]/15 rounded-lg transition"
             >
               Sign out of account
             </button>
