@@ -7,6 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { clearAuth, getToken, getUser, isAuthenticated, setAuth } from '@/lib/auth';
 import { ConversationSummary, Message, UserProfile } from '@/lib/types';
 import { Avatar } from '@/components/Avatar';
+import { SignOutModal } from '@/components/SignOutModal';
 import { getDisplayName } from '@/lib/display';
 import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket';
 
@@ -51,6 +52,9 @@ export default function ChatPage() {
   const [messageInput, setMessageInput] = useState('');
   const [sending, setSending] = useState(false);
   const [failedMessage, setFailedMessage] = useState<FailedMessageState | null>(null);
+
+  // Sign out confirmation modal state
+  const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -478,7 +482,8 @@ export default function ChatPage() {
           </Link>
 
           <button
-            onClick={handleLogout}
+            type="button"
+            onClick={() => setIsSignOutModalOpen(true)}
             className="text-xs text-[#202734]/60 hover:text-[#202734] px-2 sm:px-2.5 py-1.5 rounded-md hover:bg-black/5 transition cursor-pointer"
           >
             Sign out
@@ -898,6 +903,13 @@ export default function ChatPage() {
           )}
         </main>
       </div>
+
+      {/* Sign Out Confirmation Modal */}
+      <SignOutModal
+        isOpen={isSignOutModalOpen}
+        onClose={() => setIsSignOutModalOpen(false)}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { getUser, isAuthenticated, setAuth, clearAuth } from '@/lib/auth';
 import { disconnectSocket } from '@/lib/socket';
 import { UserProfile } from '@/lib/types';
 import { Avatar } from '@/components/Avatar';
+import { SignOutModal } from '@/components/SignOutModal';
 import { getDisplayName } from '@/lib/display';
 
 export default function ProfilePage() {
@@ -27,6 +28,9 @@ export default function ProfilePage() {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Sign out confirmation modal state
+  const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -193,7 +197,8 @@ export default function ProfilePage() {
         </div>
 
         <button
-          onClick={handleLogout}
+          type="button"
+          onClick={() => setIsSignOutModalOpen(true)}
           className="text-xs text-[#202734]/60 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition cursor-pointer"
         >
           Sign out
@@ -424,6 +429,13 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {/* Sign Out Confirmation Modal */}
+      <SignOutModal
+        isOpen={isSignOutModalOpen}
+        onClose={() => setIsSignOutModalOpen(false)}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 }
