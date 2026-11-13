@@ -156,3 +156,44 @@ conversationsRouter.get('/', requireAuth, (req: Request, res: Response): void =>
 
   res.status(200).json(summaries);
 });
+
+// GET /api/conversations/:id/messages (last 50, oldest first, participants only)
+conversationsRouter.get('/:id/messages', requireAuth, (req: Request, res: Response): void => {
+  const conversationId = Number(req.params.id);
+  if (isNaN(conversationId)) {
+    res.status(400).json({ error: 'Invalid conversation ID' });
+    return;
+  }
+
+  const conv = db
+    .prepare('SELECT id, user_a, user_b FROM conversations WHERE id = ?')
+    .get(conversationId) as { id: number; user_a: number; user_b: number } | undefined;
+
+  if (!conv) {
+    res.status(404).json({ error: 'Conversation not found' });
+    return;
+  }
+
+  // Caller must be a participant
+  if (conv.user_a !== req.user!.id && conv.user_b !== req.user!.id) {
+    res.status(403).json({ error: 'Not a participant in this conversation' });
+    return;
+  }
+
+  // Fetch last 50 messages, ordered oldest first
+  const messages = db
+    .prepare(`
+      SELECT id, conversation_id, sender_id, content, created_at
+      FROM (
+        SELECT id, conversation_id, sender_id, content, created_at
+        FROM messages
+        WHERE conversation_id = ?
+        ORDER BY id DESC
+        LIMIT 50
+      )
+      ORDER BY id ASC
+    `)
+    .all(conversationId) as Message[];
+
+  res.status(200).json(messages);
+});

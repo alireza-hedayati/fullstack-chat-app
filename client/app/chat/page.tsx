@@ -1,43 +1,85 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
-import { clearAuth, getUser, isAuthenticated, setAuth } from '@/lib/auth';
-import { ConversationSummary, UserProfile } from '@/lib/types';
+import { clearAuth, getToken, getUser, isAuthenticated, setAuth } from '@/lib/auth';
+import { ConversationSummary, Message, UserProfile } from '@/lib/types';
 import { Avatar } from '@/components/Avatar';
 import { getDisplayName } from '@/lib/display';
+import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket';
+
+function formatMessageTime(utcString: string): string {
+  try {
+    const iso = utcString.includes('T') ? utcString : utcString.replace(' ', 'T') + 'Z';
+    const date = new Date(iso);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return utcString.slice(11, 16);
+  }
+}
 
 export default function ChatPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Conversations & Messages State
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
 
-  // Search state
+  // Message Send Form State
+  const [messageInput, setMessageInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Messages Scroll Ref
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const selectedConvIdRef = useRef<number | null>(null);
+  selectedConvIdRef.current = selectedConvId;
+
+  // Initial Auth & Data Fetch
   useEffect(() => {
     if (!isAuthenticated()) {
       router.replace('/login');
       return;
     }
 
+    const token = getToken();
     const cached = getUser();
     if (cached) setCurrentUser(cached);
 
-    // Fetch fresh user profile and conversations
+    if (token) {
+      const socket = connectSocket(token);
+
+      // Listen for incoming messages
+      socket.on('message:new', (newMsg: Message) => {
+        handleIncomingMessage(newMsg);
+      });
+
+      // On reconnect, refetch active conversation history per architecture spec
+      socket.on('connect', () => {
+        if (selectedConvIdRef.current !== null) {
+          api.getMessages(selectedConvIdRef.current)
+            .then((refetched) => setMessages(refetched))
+            .catch(() => {});
+        }
+      });
+    }
+
     Promise.all([api.getMe(), api.getConversations()])
       .then(([freshUser, convList]) => {
         setCurrentUser(freshUser);
         setConversations(convList);
-        const token = localStorage.getItem('dm_auth_token');
         if (token) setAuth(token, freshUser);
       })
       .catch((err) => {
@@ -49,9 +91,115 @@ export default function ChatPage() {
       .finally(() => {
         setLoading(false);
       });
+
+    return () => {
+      const socket = getSocket();
+      if (socket) {
+        socket.off('message:new');
+      }
+    };
   }, [router]);
 
-  // Live user search handler
+  // Handle incoming message: updates active pane & sidebar
+  function handleIncomingMessage(msg: Message) {
+    if (selectedConvIdRef.current === msg.conversation_id) {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    }
+
+    // Reorder conversation list and bump to top
+    setConversations((prev) => {
+      const targetIndex = prev.findIndex((c) => c.id === msg.conversation_id);
+      if (targetIndex >= 0) {
+        const targetConv = {
+          ...prev[targetIndex],
+          last_message: msg,
+        };
+        const rest = prev.filter((_, i) => i !== targetIndex);
+        return [targetConv, ...rest];
+      }
+
+      // If conversation is unknown to caller, refetch conversation list
+      api.getConversations().then((refetched) => setConversations(refetched));
+      return prev;
+    });
+  }
+
+  // Load message history when selecting a conversation
+  useEffect(() => {
+    if (selectedConvId === null) {
+      setMessages([]);
+      return;
+    }
+
+    setLoadingMessages(true);
+    setSendError(null);
+    api.getMessages(selectedConvId)
+      .then((history) => {
+        setMessages(history);
+      })
+      .catch((err) => {
+        console.error('Failed to load messages:', err);
+      })
+      .finally(() => {
+        setLoadingMessages(false);
+      });
+  }, [selectedConvId]);
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Send message handler
+  async function handleSendMessage(e: FormEvent) {
+    e.preventDefault();
+    if (!messageInput.trim() || selectedConvId === null || sending) return;
+
+    const content = messageInput.trim();
+    setSending(true);
+    setSendError(null);
+
+    const socket = getSocket();
+    if (!socket || !socket.connected) {
+      setSendError('Realtime connection unavailable. Please wait...');
+      setSending(false);
+      return;
+    }
+
+    socket.emit(
+      'message:send',
+      { conversation_id: selectedConvId, content },
+      (ack: { ok: true; message: Message } | { ok: false; error: string }) => {
+        setSending(false);
+        if (!ack.ok) {
+          setSendError(ack.error || 'Failed to send message');
+          return;
+        }
+
+        setMessageInput('');
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === ack.message.id)) return prev;
+          return [...prev, ack.message];
+        });
+
+        // Bump conversation in sidebar
+        setConversations((prev) => {
+          const targetIndex = prev.findIndex((c) => c.id === selectedConvId);
+          if (targetIndex >= 0) {
+            const updated = { ...prev[targetIndex], last_message: ack.message };
+            const rest = prev.filter((_, i) => i !== targetIndex);
+            return [updated, ...rest];
+          }
+          return prev;
+        });
+      }
+    );
+  }
+
+  // Search users handler
   function handleSearchChange(val: string) {
     setSearchQuery(val);
 
@@ -78,14 +226,13 @@ export default function ChatPage() {
     }, 200);
   }
 
-  // Open or create a conversation with target user
+  // Open or create conversation
   async function handleOpenConversation(username: string) {
     try {
       const conv = await api.createConversation(username);
       setSearchQuery('');
       setSearchResults([]);
 
-      // Update or add conversation in list
       setConversations((prev) => {
         const exists = prev.find((c) => c.id === conv.id);
         if (exists) return prev;
@@ -99,6 +246,7 @@ export default function ChatPage() {
   }
 
   function handleLogout() {
+    disconnectSocket();
     clearAuth();
     router.replace('/login');
   }
@@ -258,7 +406,7 @@ export default function ChatPage() {
                         </span>
                         {conv.last_message && (
                           <span className="text-[10px] text-[#202734]/40 shrink-0">
-                            {conv.last_message.created_at.slice(11, 16)}
+                            {formatMessageTime(conv.last_message.created_at)}
                           </span>
                         )}
                       </div>
@@ -282,7 +430,7 @@ export default function ChatPage() {
           {selectedConversation ? (
             <div className="h-full flex flex-col">
               {/* Conversation Header */}
-              <div className="h-14 border-b border-[#202734]/10 bg-white/80 px-4 sm:px-6 flex items-center justify-between shrink-0">
+              <div className="h-14 border-b border-[#202734]/10 bg-white px-4 sm:px-6 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setSelectedConvId(null)}
@@ -303,43 +451,91 @@ export default function ChatPage() {
                 </div>
               </div>
 
-              {/* Message Pane Area (Empty State for F3) */}
-              <div className="flex-1 p-6 flex flex-col justify-center items-center text-center overflow-y-auto">
-                <div className="max-w-sm">
-                  <Avatar user={selectedConversation.peer} size="xl" className="mx-auto mb-3" />
-                  <h3 className="text-sm font-semibold text-[#202734]">
+              {/* Message History & Live Feed */}
+              <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-3">
+                {/* Thread Greeting Header */}
+                <div className="py-6 text-center border-b border-[#202734]/5 mb-4">
+                  <Avatar user={selectedConversation.peer} size="lg" className="mx-auto mb-2" />
+                  <h3 className="text-xs font-semibold text-[#202734]">
                     {getDisplayName(selectedConversation.peer)}
                   </h3>
-                  <p className="text-xs text-[#202734]/50 font-mono mt-0.5">
+                  <p className="text-[11px] text-[#202734]/50 font-mono">
                     @{selectedConversation.peer.username}
                   </p>
                   {selectedConversation.peer.bio && (
-                    <p className="text-xs text-[#202734]/70 mt-2 px-3 py-1.5 bg-white border border-[#202734]/10 rounded-lg italic">
+                    <p className="text-xs text-[#202734]/70 mt-2 max-w-sm mx-auto px-3 py-1.5 bg-white border border-[#202734]/10 rounded-lg italic">
                       &ldquo;{selectedConversation.peer.bio}&rdquo;
                     </p>
                   )}
-                  <p className="text-xs text-[#202734]/60 mt-4 leading-relaxed">
-                    This conversation is open. Instant realtime messaging will connect in F4.
+                  <p className="text-[11px] text-[#202734]/40 mt-2">
+                    This is the start of your direct conversation history.
                   </p>
                 </div>
+
+                {loadingMessages ? (
+                  <div className="text-center py-6 text-xs text-[#202734]/50 font-mono">
+                    Loading messages...
+                  </div>
+                ) : (
+                  messages.map((msg) => {
+                    const isOwn = msg.sender_id === currentUser?.id;
+
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}
+                      >
+                        <div
+                          className={`max-w-[78%] sm:max-w-md px-3.5 py-2 text-xs leading-relaxed shadow-2xs break-words ${
+                            isOwn
+                              ? 'bg-[#5D866C] text-[#F5F5F0] rounded-2xl rounded-tr-xs'
+                              : 'bg-white text-[#202734] border border-[#202734]/10 rounded-2xl rounded-tl-xs'
+                          }`}
+                        >
+                          {msg.content}
+                        </div>
+                        <span
+                          className={`text-[10px] mt-1 px-1 font-mono ${
+                            isOwn ? 'text-[#202734]/50' : 'text-[#202734]/40'
+                          }`}
+                        >
+                          {formatMessageTime(msg.created_at)}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
               </div>
 
-              {/* Message Input Footer (Disabled in F3, ready for F4) */}
-              <div className="p-4 bg-white border-t border-[#202734]/10">
-                <div className="flex items-center gap-2">
+              {/* Message Send Form */}
+              <div className="p-3 bg-white border-t border-[#202734]/10 shrink-0">
+                {sendError && (
+                  <div className="mb-2 px-3 py-1.5 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                    {sendError}
+                  </div>
+                )}
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                   <input
                     type="text"
-                    disabled
-                    placeholder="Type a message (realtime messaging connects in F4)..."
-                    className="flex-1 px-3.5 py-2 bg-[#F5F5F0]/60 border border-[#202734]/10 rounded-lg text-xs text-[#202734]/60 cursor-not-allowed"
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    placeholder="Type a message..."
+                    maxLength={2000}
+                    className="flex-1 px-3.5 py-2 bg-[#F5F5F0] border border-[#202734]/10 rounded-lg text-xs text-[#202734] placeholder:text-[#202734]/40 focus:bg-white focus:outline-none focus:border-[#5D866C] focus:ring-1 focus:ring-[#5D866C] transition"
                   />
                   <button
-                    disabled
-                    className="px-4 py-2 bg-[#5D866C]/50 text-[#F5F5F0] text-xs font-medium rounded-lg cursor-not-allowed"
+                    type="submit"
+                    disabled={sending || !messageInput.trim()}
+                    className="px-4 py-2 bg-[#5D866C] hover:bg-[#4d705a] active:bg-[#41604c] disabled:opacity-40 text-[#F5F5F0] text-xs font-medium rounded-lg transition shadow-xs shrink-0 flex items-center gap-1.5"
                   >
-                    Send
+                    {sending ? (
+                      <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      'Send'
+                    )}
                   </button>
-                </div>
+                </form>
               </div>
             </div>
           ) : (

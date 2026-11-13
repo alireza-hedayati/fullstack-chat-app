@@ -10,6 +10,10 @@ Append-only. One entry per finished feature, newest at the top. Format:
 
 ---
 
+## 2026-11-13 — F4 Realtime messaging
+- Server: implemented `sockets.ts` with JWT handshake authentication, personal `user:<id>` room routing, `message:send` with database insertion, ack feedback, and `message:new` dual-room broadcast; added `GET /api/conversations/:id/messages` returning last 50 messages for authorized participants.
+- Client: built `lib/socket.ts` client singleton with auto-reconnection and authentication error management; built live message thread in `/chat` with auto-scroll, message bubbles, timestamps, send form with ack handling, and dynamic sidebar reordering on incoming messages.
+
 ## 2026-11-12 — F3 Find people & conversations
 - Server: implemented `GET /api/users?q=` prefix search (max 10, excludes caller and deleted users), `POST /api/conversations` (get-or-create normalized `user_a < user_b`), and `GET /api/conversations` (recent activity first with peer profile & last message).
 - Client: built responsive two-column `/chat` layout with live user search dropdown, conversation list with avatars and previews, and selected conversation thread header.

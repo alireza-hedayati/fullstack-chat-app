@@ -1,5 +1,5 @@
 import { getToken, clearAuth } from './auth';
-import { AuthResponse, ConversationSummary, UserProfile } from './types';
+import { AuthResponse, ConversationSummary, Message, UserProfile } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -94,5 +94,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ username }),
     });
+  },
+
+  getMessages(conversationId: number): Promise<Message[]> {
+    return request<Message[]>(`/api/conversations/${conversationId}/messages`);
   },
 };
