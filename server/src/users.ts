@@ -21,7 +21,6 @@ usersRouter.get('/me', requireAuth, (req: Request, res: Response): void => {
 usersRouter.patch('/me', requireAuth, (req: Request, res: Response): void => {
   const { first_name, last_name, bio } = req.body ?? {};
 
-  // Validate types if provided
   if (first_name !== undefined && typeof first_name !== 'string') {
     res.status(400).json({ error: 'First name must be a string' });
     return;
@@ -39,7 +38,6 @@ usersRouter.patch('/me', requireAuth, (req: Request, res: Response): void => {
   const trimmedLast = last_name !== undefined ? last_name.trim() : undefined;
   const trimmedBio = bio !== undefined ? bio.trim() : undefined;
 
-  // Validate lengths per API contract: first/last <= 40, bio <= 200
   if (trimmedFirst !== undefined && trimmedFirst.length > 40) {
     res.status(400).json({ error: 'First name must not exceed 40 characters' });
     return;
@@ -53,7 +51,6 @@ usersRouter.patch('/me', requireAuth, (req: Request, res: Response): void => {
     return;
   }
 
-  // Update fields with prepared statement; COALESCE preserves untouched fields
   db.prepare(`
     UPDATE users
     SET first_name = COALESCE(?, first_name),
@@ -73,4 +70,28 @@ usersRouter.patch('/me', requireAuth, (req: Request, res: Response): void => {
 
   const profile: UserProfile = toUserProfile(updated);
   res.status(200).json(profile);
+});
+
+usersRouter.get('/users', requireAuth, (req: Request, res: Response): void => {
+  const query = req.query.q;
+  if (typeof query !== 'string' || !query.trim()) {
+    res.status(400).json({ error: "Search query 'q' is required" });
+    return;
+  }
+
+  const trimmedQuery = query.trim();
+  const rows = db
+    .prepare(`
+      SELECT id, username, first_name, last_name, bio, deleted_at
+      FROM users
+      WHERE username LIKE ? || '%'
+        AND id != ?
+        AND deleted_at IS NULL
+      ORDER BY username ASC
+      LIMIT 10
+    `)
+    .all(trimmedQuery, req.user!.id) as UserRow[];
+
+  const profiles: UserProfile[] = rows.map(toUserProfile);
+  res.status(200).json(profiles);
 });

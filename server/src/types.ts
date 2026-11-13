@@ -16,3 +16,17 @@ export interface JWTPayload {
   id: number;
   username: string;
 }
+
+export interface Message {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  content: string;
+  created_at: string;
+}
+
+export interface ConversationSummary {
+  id: number;
+  peer: UserProfile;
+  last_message: Message | null;
+}

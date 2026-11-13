@@ -3,6 +3,7 @@ import cors from 'cors';
 import { db } from './db';
 import { authRouter } from './auth';
 import { usersRouter } from './users';
+import { conversationsRouter } from './conversations';
 
 if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET environment variable is required.');
@@ -31,6 +32,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api', usersRouter);
+app.use('/api/conversations', conversationsRouter);
 
 export const server = app.listen(port, () => {
   console.log(`Server listening on port ${port}`);

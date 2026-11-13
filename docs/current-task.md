@@ -1,38 +1,39 @@
 # current-task — The Single Active Task
 
-**Task:** F3 — Find people & conversations
+**Task:** F4 — Realtime messaging
 **Status:** not started
-**Spec:** see `features.md` → F3. Read `rules.md` and `architecture.md` (§Data model, §API contract) before starting. Note: invoke frontend-design skill before building/restyling UI.
+**Spec:** see `features.md` → F4. Read `stack.md`, `rules.md`, and `architecture.md` (§Socket routing model, §API contract) before starting. Note: fetch Socket.IO docs via Context7 before implementing.
 
 ## Scope
 
 - Server:
-  - `GET /api/users?q=`: username prefix search (max 10 results, excludes caller and deleted users)
-  - `POST /api/conversations`: get-or-create conversation with `{username}` (returns `200` existing or `201` created `ConversationSummary`)
-  - `GET /api/conversations`: list caller's conversations with peer profile and last message, sorted by most recent activity first
+  - `sockets.ts`: Socket.IO initialization with JWT handshake auth
+  - Sockets join personal room `user:<id>` on connection
+  - `message:send` socket event: validate participant & content (non-empty trimmed, ≤ 2000 chars) → INSERT into `messages` → ack success/error → emit `message:new` to `user:<sender>` and `user:<peer>`
+  - `GET /api/conversations/:id/messages`: return last 50 messages (oldest first, authorized participants only)
 - Client:
-  - `/chat` layout: responsive sidebar with conversation list and search box
-  - Search input with live results to start or open a conversation
-  - Conversation list displaying peer avatar, display name, and last message preview
-  - Empty state message pane for selected conversation (realtime messaging in F4)
+  - `lib/socket.ts`: Socket.IO client singleton connecting on login and disconnecting on logout
+  - Message pane: load and display message history + incoming live messages
+  - Message send form: active sending with Socket.IO ack handling
+  - Sidebar reaction: `message:new` bumps conversation to top, updates last message preview, and refetches conversation list if unknown
 
 ## Out of scope
 
-- Realtime socket event fan-out (`message:send`, `message:new` — F4)
-- Message history fetching (F4)
-- Account deletion (F5)
+- Account deletion (`DELETE /api/me` — F5)
+- Read receipts, typing indicators, reactions (Non-goals)
 
 ## Checklist (verify before marking done)
 
-- [ ] `GET /api/users?q=` returns matching users (case-insensitive prefix), excluding caller and deleted accounts
-- [ ] `POST /api/conversations` creates a conversation if none exists (normalized `user_a < user_b`)
-- [ ] `POST /api/conversations` with the same peer reuses the existing conversation
-- [ ] `GET /api/conversations` returns conversations ordered by recent activity
-- [ ] Client sidebar renders conversations with peer avatar and display name
-- [ ] Selecting a conversation displays the active conversation panel
+- [ ] Socket rejects connection with invalid/missing token
+- [ ] Socket joins `user:<id>` room upon valid authentication
+- [ ] `message:send` persists message and emits `message:new` to both participant rooms
+- [ ] `GET /api/conversations/:id/messages` returns last 50 messages in chronological order
+- [ ] Unauthorized user cannot read conversation messages (returns 403)
+- [ ] Live messages render in real time on both sender and recipient screens
+- [ ] Messages persist across server restart
 - [ ] `cd server && npx tsc --noEmit` — clean
 - [ ] `npm run build --prefix client` — clean
 
 ## On completion
 
-Append entry to `done.md` → load F4 into this file → commit.
+Append entry to `done.md` → load F5 into this file → commit.

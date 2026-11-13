@@ -10,6 +10,10 @@ Append-only. One entry per finished feature, newest at the top. Format:
 
 ---
 
+## 2026-11-12 — F3 Find people & conversations
+- Server: implemented `GET /api/users?q=` prefix search (max 10, excludes caller and deleted users), `POST /api/conversations` (get-or-create normalized `user_a < user_b`), and `GET /api/conversations` (recent activity first with peer profile & last message).
+- Client: built responsive two-column `/chat` layout with live user search dropdown, conversation list with avatars and previews, and selected conversation thread header.
+
 ## 2026-11-12 — F2 Profile
 - Server: implemented `PATCH /api/me` with length validation (first/last name ≤ 40, bio ≤ 200) updating SQLite via raw prepared SQL and returning updated `UserProfile`.
 - Client: implemented `Avatar` component with initials derivation and deterministic palette hashing; built dedicated `/profile` page with live preview and save confirmation; added profile navigation in `/chat`.
