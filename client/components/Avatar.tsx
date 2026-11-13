@@ -9,10 +9,10 @@ interface AvatarProps {
 }
 
 const SIZE_CLASSES = {
-  sm: 'w-5.5 h-5.5 text-[10px] font-semibold rounded-md',
-  md: 'w-7 h-7 text-xs font-semibold rounded-lg',
-  lg: 'w-9 h-9 text-xs font-semibold rounded-xl',
-  xl: 'w-12 h-12 text-sm font-semibold rounded-xl',
+  sm: 'w-6 h-6 text-[10px] font-semibold',
+  md: 'w-8 h-8 text-xs font-semibold',
+  lg: 'w-10 h-10 text-sm font-bold',
+  xl: 'w-13 h-13 text-base font-bold',
 };
 
 export function Avatar({ user, size = 'md', className = '' }: AvatarProps) {
@@ -21,15 +21,16 @@ export function Avatar({ user, size = 'md', className = '' }: AvatarProps) {
 
   return (
     <div
-      className={`inline-flex items-center justify-center select-none shrink-0 transition-colors shadow-2xs ${SIZE_CLASSES[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-full select-none shrink-0 transition-transform duration-150 ring-1 ring-black/5 dark:ring-white/10 ${SIZE_CLASSES[size]} ${className}`}
       style={{
-        backgroundColor: color.bg,
+        background: `linear-gradient(140deg, ${color.bg} 0%, ${color.border} 100%)`,
         color: color.text,
-        border: `1px solid ${color.border}`,
+        boxShadow:
+          '0 1.5px 3px rgba(32, 39, 52, 0.08), inset 0 1px 0.5px rgba(255, 255, 255, 0.25)',
       }}
       aria-label={`Avatar for ${user.username}`}
     >
-      {initials}
+      <span className="leading-none transform translate-y-[-0.5px]">{initials}</span>
     </div>
   );
 }
