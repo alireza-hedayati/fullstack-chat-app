@@ -9,10 +9,10 @@ interface AvatarProps {
 }
 
 const SIZE_CLASSES = {
-  sm: 'w-6 h-6 text-[10px] font-semibold',
-  md: 'w-8 h-8 text-xs font-semibold',
-  lg: 'w-10 h-10 text-sm font-bold',
-  xl: 'w-13 h-13 text-base font-bold',
+  sm: 'w-6 h-6 text-[11.5px] font-semibold',
+  md: 'w-8 h-8 text-[13.5px] font-semibold',
+  lg: 'w-10 h-10 text-[15.5px] font-bold',
+  xl: 'w-13 h-13 text-[18.5px] font-bold',
 };
 
 export function Avatar({ user, size = 'md', className = '' }: AvatarProps) {
@@ -30,7 +30,9 @@ export function Avatar({ user, size = 'md', className = '' }: AvatarProps) {
       }}
       aria-label={`Avatar for ${user.username}`}
     >
-      <span className="leading-none transform translate-y-[-0.5px]">{initials}</span>
+      <span className="leading-none tracking-tight transform translate-y-[-0.5px]">
+        {initials}
+      </span>
     </div>
   );
 }
