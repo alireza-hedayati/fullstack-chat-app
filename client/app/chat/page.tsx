@@ -46,9 +46,9 @@ export default function ChatPage() {
 
   if (loading && !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] text-[#202734]/60">
         <div className="flex items-center gap-2.5 text-xs font-mono">
-          <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-[#5D866C] animate-pulse" />
           <span>Connecting session...</span>
         </div>
       </div>
@@ -62,26 +62,26 @@ export default function ChatPage() {
       : user?.username;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+    <div className="min-h-screen bg-[#F5F5F0] text-[#202734] flex flex-col">
       {/* Top Application Bar */}
-      <header className="h-14 border-b border-slate-200/90 px-6 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
+      <header className="h-14 border-b border-[#202734]/10 px-6 flex items-center justify-between bg-white/70 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center font-bold text-[11px] text-white shadow-xs">
+          <div className="w-6 h-6 rounded-md bg-[#5D866C] flex items-center justify-center font-bold text-[11px] text-[#F5F5F0] shadow-xs">
             DM
           </div>
-          <span className="font-semibold text-sm text-slate-900 tracking-tight">DM Messenger</span>
+          <span className="font-semibold text-sm text-[#202734] tracking-tight">DM Messenger</span>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 pl-3 py-1 pr-1.5 rounded-full bg-slate-100/80 border border-slate-200/80">
-            <span className="text-xs text-slate-700 font-medium">@{user?.username}</span>
-            <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 font-semibold text-[11px] flex items-center justify-center border border-blue-200/50">
+          <div className="flex items-center gap-2 pl-3 py-1 pr-1.5 rounded-full bg-white border border-[#202734]/10 shadow-2xs">
+            <span className="text-xs text-[#202734] font-medium">@{user?.username}</span>
+            <div className="w-6 h-6 rounded-full bg-[#5D866C]/15 text-[#5D866C] font-semibold text-[11px] flex items-center justify-center border border-[#5D866C]/25">
               {initials}
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="text-xs text-slate-500 hover:text-slate-900 px-2.5 py-1.5 rounded-md hover:bg-slate-100 transition"
+            className="text-xs text-[#202734]/60 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition"
           >
             Sign out
           </button>
@@ -90,21 +90,21 @@ export default function ChatPage() {
 
       {/* Main Container */}
       <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-sm bg-white border border-slate-200/90 rounded-2xl p-8 text-center shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-          <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 font-semibold text-lg flex items-center justify-center mx-auto mb-4">
+        <div className="w-full max-w-sm bg-white border border-[#202734]/10 rounded-2xl p-8 text-center shadow-[0_2px_12px_rgba(32,39,52,0.04)]">
+          <div className="w-14 h-14 rounded-2xl bg-[#5D866C]/12 border border-[#5D866C]/20 text-[#5D866C] font-semibold text-lg flex items-center justify-center mx-auto mb-4">
             {initials}
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 tracking-tight">
+          <h2 className="text-lg font-semibold text-[#202734] tracking-tight">
             Signed in as {displayName}
           </h2>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
+          <p className="text-xs text-[#202734]/60 mt-1 max-w-xs mx-auto leading-relaxed">
             Your credentials and session are verified. Realtime conversations and profiles unlock in the next steps.
           </p>
 
-          <div className="mt-6 pt-6 border-t border-slate-100">
+          <div className="mt-6 pt-6 border-t border-[#202734]/10">
             <button
               onClick={handleLogout}
-              className="w-full px-4 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+              className="w-full px-4 py-2 text-xs font-medium text-[#202734] hover:bg-[#F5F5F0] bg-white border border-[#202734]/15 rounded-lg transition"
             >
               Sign out of account
             </button>
