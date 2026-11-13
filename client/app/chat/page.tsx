@@ -453,23 +453,31 @@ export default function ChatPage() {
 
               {/* Message History & Live Feed */}
               <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-3">
-                {/* Thread Greeting Header */}
-                <div className="py-6 text-center border-b border-[#202734]/5 mb-4">
-                  <Avatar user={selectedConversation.peer} size="lg" className="mx-auto mb-2" />
-                  <h3 className="text-xs font-semibold text-[#202734]">
-                    {getDisplayName(selectedConversation.peer)}
-                  </h3>
-                  <p className="text-[11px] text-[#202734]/50 font-mono">
-                    @{selectedConversation.peer.username}
-                  </p>
-                  {selectedConversation.peer.bio && (
-                    <p className="text-xs text-[#202734]/70 mt-2 max-w-sm mx-auto px-3 py-1.5 bg-white border border-[#202734]/10 rounded-lg italic">
-                      &ldquo;{selectedConversation.peer.bio}&rdquo;
-                    </p>
-                  )}
-                  <p className="text-[11px] text-[#202734]/40 mt-2">
-                    This is the start of your direct conversation history.
-                  </p>
+                {/* Compact Left-Aligned Peer Info Card */}
+                <div className="p-3 bg-white border border-[#202734]/10 rounded-xl mb-4 flex items-center gap-3.5 shadow-[0_1px_3px_rgba(32,39,52,0.03)]">
+                  <Avatar user={selectedConversation.peer} size="lg" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-xs font-semibold text-[#202734]">
+                        {getDisplayName(selectedConversation.peer)}
+                      </h3>
+                      <span className="text-[11px] text-[#202734]/50 font-mono">
+                        @{selectedConversation.peer.username}
+                      </span>
+                      <span className="text-[10px] font-medium text-[#5D866C] bg-[#5D866C]/10 px-1.5 py-0.5 rounded">
+                        Direct
+                      </span>
+                    </div>
+                    {selectedConversation.peer.bio ? (
+                      <p className="text-[11px] text-[#202734]/70 mt-0.5 truncate">
+                        &ldquo;{selectedConversation.peer.bio}&rdquo;
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-[#202734]/40 mt-0.5">
+                        Direct conversation with @{selectedConversation.peer.username}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {loadingMessages ? (
