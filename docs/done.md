@@ -10,6 +10,11 @@ Append-only. One entry per finished feature, newest at the top. Format:
 
 ---
 
+## 2026-11-12 — F0 Scaffolding
+- Monorepo scaffolded: client (Next.js App Router, TypeScript, Tailwind CSS, ESLint) and server (Express, TypeScript, better-sqlite3).
+- Health check endpoint `GET /api/health` responding `{"ok":true}` and raw SQLite schema initialized automatically on startup (`users`, `conversations`, `messages`).
+- Enforced strict env validation requiring `JWT_SECRET` to run; configured root README and environment files.
+
 ## 2026-07-09 — Context designed
 - Project defined: DM messenger (instant DMs, initials avatars, anonymize on
   delete). Seven context docs written; no code yet.

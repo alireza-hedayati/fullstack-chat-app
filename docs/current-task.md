@@ -1,37 +1,41 @@
 # current-task — The Single Active Task
 
-**Task:** F0 — Scaffolding
+**Task:** F1 — Auth
 **Status:** not started
-**Spec:** see `features.md` → F0. Read `stack.md` and `architecture.md`
-(folder layout + data model) before starting.
+**Spec:** see `features.md` → F1. Read `rules.md` (§Code) and `architecture.md` (§Data model, §API contract) before starting.
 
 ## Scope
 
-- `client/`: create-next-app — TypeScript, Tailwind, App Router, ESLint, npm
-- `server/`: TypeScript Express app written by hand (no generator):
-  `index.ts` with `GET /api/health`, `db.ts` creating the full schema from
-  `architecture.md`, `tsconfig.json` (strict), scripts: `dev` (tsx watch),
-  `build` (tsc), `start`
-- `server/.env` + `server/.env.example` (PORT, JWT_SECRET, CLIENT_URL);
-  `client/.env.local` (NEXT_PUBLIC_API_URL); `.gitignore` covering
-  node_modules, dist, chat.db*, .env*
-- Root `README.md`: what this is + how to run both apps
+- Server:
+  - `POST /api/auth/signup`: validate username/password, hash password with bcrypt, insert user, return JWT and UserProfile
+  - `POST /api/auth/login`: validate credentials, compare bcrypt hash, return JWT and UserProfile
+  - `requireAuth` middleware: verify JWT and ensure user is active (not deleted)
+  - `GET /api/me`: return caller's UserProfile
+- Client:
+  - `/signup` and `/login` pages with inline server error feedback
+  - Auth token & user state in `localStorage`
+  - `lib/api.ts` fetch wrapper attaching auth header
+  - Root page redirect (token → `/chat`, no token → `/login`)
+  - Logout functionality (clears storage)
 
 ## Out of scope
 
-No auth, no routes beyond health, no socket code, no UI beyond the
-create-next-app default page. (Those are F1-F4.)
+- Profile editing (`PATCH /api/me` — F2)
+- Conversations and user search (F3)
+- Realtime sockets (F4)
 
 ## Checklist (verify before marking done)
 
-- [ ] `npm run dev --prefix server` starts on :4000
-- [ ] `curl localhost:4000/api/health` → `{"ok":true}`
-- [ ] First server start creates `chat.db` with users, conversations, messages
-- [ ] Server refuses to start when `JWT_SECRET` is missing
-- [ ] `npm run dev --prefix client` renders on :3000
+- [ ] Sign up with valid credentials creates user, returns token and profile
+- [ ] Duplicate username returns error without leaking internals
+- [ ] Log in with wrong credentials returns friendly error
+- [ ] `GET /api/me` without token returns 401
+- [ ] `GET /api/me` with valid token returns user profile
+- [ ] Browser refresh maintains authenticated state
+- [ ] Log out clears credentials and redirects to `/login`
 - [ ] `cd server && npx tsc --noEmit` — clean
 - [ ] `npm run build --prefix client` — clean
 
 ## On completion
 
-Append entry to `done.md` → load F1 into this file → commit.
+Append entry to `done.md` → load F2 into this file → commit.
