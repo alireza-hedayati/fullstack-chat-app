@@ -9,10 +9,10 @@ interface AvatarProps {
 }
 
 const SIZE_CLASSES = {
-  sm: 'w-6 h-6 text-[10px] font-semibold',
-  md: 'w-8 h-8 text-xs font-semibold',
-  lg: 'w-12 h-12 text-base font-bold',
-  xl: 'w-16 h-16 text-xl font-bold',
+  sm: 'w-5.5 h-5.5 text-[10px] font-semibold rounded-md',
+  md: 'w-7 h-7 text-xs font-semibold rounded-lg',
+  lg: 'w-9 h-9 text-xs font-semibold rounded-xl',
+  xl: 'w-12 h-12 text-sm font-semibold rounded-xl',
 };
 
 export function Avatar({ user, size = 'md', className = '' }: AvatarProps) {
@@ -21,7 +21,7 @@ export function Avatar({ user, size = 'md', className = '' }: AvatarProps) {
 
   return (
     <div
-      className={`inline-flex items-center justify-center rounded-2xl select-none shrink-0 transition-colors shadow-2xs ${SIZE_CLASSES[size]} ${className}`}
+      className={`inline-flex items-center justify-center select-none shrink-0 transition-colors shadow-2xs ${SIZE_CLASSES[size]} ${className}`}
       style={{
         backgroundColor: color.bg,
         color: color.text,
