@@ -10,6 +10,10 @@ Append-only. One entry per finished feature, newest at the top. Format:
 
 ---
 
+## 2026-11-13 — F7 Unread message badges
+- Client: implemented unread message counter per conversation; incoming messages for non-active conversations increment counter, highlight the conversation row, and display a counter pill badge on the right side of the sidebar item.
+- UX & Persistence: opening a conversation clears its unread count; dynamic browser tab title displays `(N) DM Messenger` when unread messages exist; unread counts persist per-user across page reloads.
+
 ## 2026-11-13 — F6 Polish
 - Client UX: implemented auto-scroll with reading-history protection (no scroll-snatch when user is scrolled up, with floating "New messages ↓" pill), alternating message loading skeletons, and empty states for conversation list, user search, and fresh chat threads.
 - Realtime resilience: added live connection-state tracking (`connected`, `reconnecting`, `disconnected`) with top banner feedback, automatic history refetch on reconnect, and inline failed-send alert with one-click retry.

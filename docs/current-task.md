@@ -1,30 +1,30 @@
 # current-task — The Single Active Task
 
-**Task:** F6 — Polish
+**Task:** F7 — Unread message badges
 **Status:** completed
-**Spec:** see `features.md` → F6.
+**Spec:** see `features.md` → F7.
 
 ## Completed Work
 
-- Auto-scroll behavior: smooth scroll when near bottom, no scroll snatching when reading history, floating "New messages ↓" pill when new messages arrive.
-- Empty states: tailored empty state for conversation list, user search results, and fresh conversation threads.
-- Loading states: skeleton layout for initial load and message history (no layout jumps or unstyled flashes).
-- Realtime connection indicator: tracks `connected` / `reconnecting` / `disconnected` status with reconnect banner and automatic history refetch upon reconnecting.
-- Failed-send error banner with 1-click "Retry" and dismiss actions.
-- Responsive design: optimized for 375px mobile viewport with back button, compact padding, and touch-friendly controls.
-- Consistent `#F5F5F0`, `#5D866C`, and `#202734` palette alignment across all pages.
+- Track unread message count per conversation in client state and persist per-user in `localStorage`.
+- When `message:new` arrives for a conversation that is not currently selected, increment its unread counter and bump conversation to top.
+- Display unread counter badge on the right side of the conversation card in the sidebar:
+  - Sage green `#5D866C` pill badge with bold white number
+  - Bold peer name and last message snippet when unread
+  - Graceful support for counts > 99 (`99+`)
+- Clear unread count when conversation is opened / selected.
+- Dynamic document title: `(${totalUnread}) DM Messenger` when unread messages exist, reverting to `DM Messenger` when read or upon logout.
 
 ## Checklist
 
-- [x] Killing server shows disconnected / reconnecting state in UI; restart recovers
-- [x] Auto-scroll smoothly keeps to bottom on new messages if near bottom, doesn't snatch scroll if reading history
-- [x] Empty state for conversation list, search results, and empty chat thread
-- [x] Loading states clean with no layout jumps or unstyled flashes
-- [x] Failed message send clearly surfaces error feedback
-- [x] Responsive layout fully usable at 375px viewport width
+- [x] Receiving message for non-active conversation increments its counter
+- [x] Badge displays with number on the right side of the sidebar conversation item
+- [x] Selecting the conversation clears the badge
+- [x] Incoming messages for currently active conversation do not increment unread counter
+- [x] Document title reflects total unread count when > 0
 - [x] `cd server && npx tsc --noEmit` — clean
 - [x] `npm run build --prefix client` — clean
 
 ---
 
-*All roadmap features (F0 through F6) are completed. See `features.md` §Later for candidate future features.*
+*All roadmap features (F0 through F7) are completed. See `features.md` §Later for candidate future features.*

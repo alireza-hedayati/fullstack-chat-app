@@ -97,10 +97,23 @@ failed-send feedback, consistent Tailwind pass, usable at 375px width.
 **Acceptance:** no layout jumps or unstyled flashes; killing the server shows
 disconnected and restart recovers; every list has a sensible empty state.
 
+## F7 — Unread message badges
+
+- Client: track unread message count per conversation; when an incoming message
+  arrives for an inactive conversation, bump conversation to top and display
+  unread count badge on the right side of the sidebar item; opening the
+  conversation clears its unread count; tab title updates to `(N) DM Messenger`;
+  unread counts persist across page reloads.
+
+**Acceptance:** receiving a message while in another conversation increments
+and shows unread badge with counter on the right side of that conversation;
+selecting that conversation clears the badge; total unread count reflects in
+document title.
+
 ---
 
 ## Later (do not build without promoting to a numbered feature first)
 
-Typing indicator · online presence · unread badges · history pagination ·
+Typing indicator · online presence · history pagination ·
 avatar image upload · blocking users · rate limiting · group chats ·
 httpOnly-cookie auth (required before any deployment)

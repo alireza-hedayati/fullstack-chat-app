@@ -43,6 +43,9 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
+  // Unread Message Counts per Conversation
+  const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({});
+
   // Auto-scroll & Read State
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef(true);
@@ -102,6 +105,12 @@ export default function ChatPage() {
       } else {
         setHasNewMessagesBelow(true);
       }
+    } else {
+      // Message is for another conversation -> increment unread count
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [msg.conversation_id]: (prev[msg.conversation_id] || 0) + 1,
+      }));
     }
 
     // Reorder conversation list and bump to top
@@ -121,6 +130,37 @@ export default function ChatPage() {
       return prev;
     });
   }, [scrollToBottom]);
+
+  // Load persisted unread counts for current user
+  useEffect(() => {
+    if (currentUser) {
+      try {
+        const saved = localStorage.getItem(`dm_unread_${currentUser.id}`);
+        if (saved) {
+          setUnreadCounts(JSON.parse(saved));
+        }
+      } catch {}
+    }
+  }, [currentUser]);
+
+  // Persist unread counts whenever they change
+  useEffect(() => {
+    if (currentUser) {
+      try {
+        localStorage.setItem(`dm_unread_${currentUser.id}`, JSON.stringify(unreadCounts));
+      } catch {}
+    }
+  }, [currentUser, unreadCounts]);
+
+  // Update browser document title with total unread count
+  useEffect(() => {
+    const total = Object.values(unreadCounts).reduce((acc, count) => acc + count, 0);
+    if (total > 0) {
+      document.title = `(${total}) DM Messenger`;
+    } else {
+      document.title = 'DM Messenger';
+    }
+  }, [unreadCounts]);
 
   // Initial Auth & Data Fetch + Socket Setup
   useEffect(() => {
@@ -203,6 +243,14 @@ export default function ChatPage() {
       setHasNewMessagesBelow(false);
       return;
     }
+
+    // Clear unread badge for the newly selected conversation
+    setUnreadCounts((prev) => {
+      if (!prev[selectedConvId]) return prev;
+      const next = { ...prev };
+      delete next[selectedConvId];
+      return next;
+    });
 
     setLoadingMessages(true);
     setFailedMessage(null);
@@ -382,6 +430,9 @@ export default function ChatPage() {
   function handleLogout() {
     disconnectSocket();
     clearAuth();
+    if (typeof document !== 'undefined') {
+      document.title = 'DM Messenger';
+    }
     router.replace('/login');
   }
 
@@ -615,6 +666,7 @@ export default function ChatPage() {
                 const isActive = conv.id === selectedConvId;
                 const peerName = getDisplayName(conv.peer);
                 const lastText = conv.last_message?.content || 'No messages yet';
+                const unread = unreadCounts[conv.id] || 0;
 
                 return (
                   <button
@@ -629,17 +681,39 @@ export default function ChatPage() {
                     <Avatar user={conv.peer} size="md" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-semibold text-[#202734] truncate">
+                        <span
+                          className={`text-xs truncate ${
+                            unread > 0 ? 'font-bold text-[#202734]' : 'font-semibold text-[#202734]'
+                          }`}
+                        >
                           {peerName}
                         </span>
                         {conv.last_message && (
-                          <span className="text-[10px] text-[#202734]/40 shrink-0">
+                          <span
+                            className={`text-[10px] shrink-0 ${
+                              unread > 0 ? 'text-[#5D866C] font-semibold' : 'text-[#202734]/40'
+                            }`}
+                          >
                             {formatMessageTime(conv.last_message.created_at)}
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-[#202734]/60 truncate">
-                        {lastText}
+                      <div className="flex items-center justify-between gap-2">
+                        <div
+                          className={`text-[11px] truncate ${
+                            unread > 0 ? 'text-[#202734] font-medium' : 'text-[#202734]/60'
+                          }`}
+                        >
+                          {lastText}
+                        </div>
+                        {unread > 0 && (
+                          <span
+                            className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-[#5D866C] text-[#F5F5F0] text-[10px] font-bold flex items-center justify-center leading-none shadow-2xs"
+                            aria-label={`${unread} unread messages`}
+                          >
+                            {unread > 99 ? '99+' : unread}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </button>
