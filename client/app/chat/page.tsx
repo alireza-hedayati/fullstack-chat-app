@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, FormEvent } from 'react';
+import { useEffect, useState, useRef, FormEvent, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -20,10 +20,21 @@ function formatMessageTime(utcString: string): string {
   }
 }
 
+type ConnectionState = 'connected' | 'reconnecting' | 'disconnected';
+
+interface FailedMessageState {
+  conversationId: number;
+  content: string;
+  error: string;
+}
+
 export default function ChatPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // Realtime Connection State
+  const [connectionState, setConnectionState] = useState<ConnectionState>('connected');
 
   // Conversations & Messages State
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -31,10 +42,15 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
+  // Auto-scroll & Read State
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef(true);
+  const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
+
   // Message Send Form State
   const [messageInput, setMessageInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
+  const [failedMessage, setFailedMessage] = useState<FailedMessageState | null>(null);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,71 +58,46 @@ export default function ChatPage() {
   const [searching, setSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Messages Scroll Ref
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  // Ref tracking current selection for socket events
   const selectedConvIdRef = useRef<number | null>(null);
   selectedConvIdRef.current = selectedConvId;
 
-  // Initial Auth & Data Fetch
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      router.replace('/login');
-      return;
-    }
-
-    const token = getToken();
-    const cached = getUser();
-    if (cached) setCurrentUser(cached);
-
-    if (token) {
-      const socket = connectSocket(token);
-
-      // Listen for incoming messages
-      socket.on('message:new', (newMsg: Message) => {
-        handleIncomingMessage(newMsg);
-      });
-
-      // On reconnect, refetch active conversation history per architecture spec
-      socket.on('connect', () => {
-        if (selectedConvIdRef.current !== null) {
-          api.getMessages(selectedConvIdRef.current)
-            .then((refetched) => setMessages(refetched))
-            .catch(() => {});
-        }
+  // Scroll Helper
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior,
       });
     }
+    setHasNewMessagesBelow(false);
+  }, []);
 
-    Promise.all([api.getMe(), api.getConversations()])
-      .then(([freshUser, convList]) => {
-        setCurrentUser(freshUser);
-        setConversations(convList);
-        if (token) setAuth(token, freshUser);
-      })
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 401) {
-          clearAuth();
-          router.replace('/login');
-        }
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-
-    return () => {
-      const socket = getSocket();
-      if (socket) {
-        socket.off('message:new');
-      }
-    };
-  }, [router]);
+  // Monitor scroll position to detect if reading history vs near bottom
+  function handleContainerScroll() {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const near = distanceFromBottom < 80;
+    isNearBottomRef.current = near;
+    if (near) {
+      setHasNewMessagesBelow(false);
+    }
+  }
 
   // Handle incoming message: updates active pane & sidebar
-  function handleIncomingMessage(msg: Message) {
+  const handleIncomingMessage = useCallback((msg: Message) => {
     if (selectedConvIdRef.current === msg.conversation_id) {
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
+
+      if (isNearBottomRef.current) {
+        requestAnimationFrame(() => scrollToBottom('smooth'));
+      } else {
+        setHasNewMessagesBelow(true);
+      }
     }
 
     // Reorder conversation list and bump to top
@@ -125,20 +116,101 @@ export default function ChatPage() {
       api.getConversations().then((refetched) => setConversations(refetched));
       return prev;
     });
-  }
+  }, [scrollToBottom]);
+
+  // Initial Auth & Data Fetch + Socket Setup
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.replace('/login');
+      return;
+    }
+
+    const token = getToken();
+    const cached = getUser();
+    if (cached) setCurrentUser(cached);
+
+    if (token) {
+      const socket = connectSocket(token);
+
+      if (socket.connected) {
+        setConnectionState('connected');
+      }
+
+      socket.on('connect', () => {
+        setConnectionState('connected');
+        // On reconnect, refetch active conversation history per architecture spec
+        if (selectedConvIdRef.current !== null) {
+          api.getMessages(selectedConvIdRef.current)
+            .then((refetched) => {
+              setMessages(refetched);
+              if (isNearBottomRef.current) {
+                requestAnimationFrame(() => scrollToBottom('instant'));
+              }
+            })
+            .catch(() => {});
+        }
+      });
+
+      socket.on('disconnect', () => {
+        setConnectionState('disconnected');
+      });
+
+      socket.on('connect_error', () => {
+        setConnectionState('reconnecting');
+      });
+
+      socket.on('message:new', (newMsg: Message) => {
+        handleIncomingMessage(newMsg);
+      });
+    }
+
+    Promise.all([api.getMe(), api.getConversations()])
+      .then(([freshUser, convList]) => {
+        setCurrentUser(freshUser);
+        setConversations(convList);
+        if (token) setAuth(token, freshUser);
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          clearAuth();
+          router.replace('/login');
+        }
+      })
+      .finally(() => {
+        setInitialLoading(false);
+      });
+
+    return () => {
+      const socket = getSocket();
+      if (socket) {
+        socket.off('message:new');
+        socket.off('connect');
+        socket.off('disconnect');
+        socket.off('connect_error');
+      }
+    };
+  }, [router, handleIncomingMessage, scrollToBottom]);
 
   // Load message history when selecting a conversation
   useEffect(() => {
     if (selectedConvId === null) {
       setMessages([]);
+      setFailedMessage(null);
+      setHasNewMessagesBelow(false);
       return;
     }
 
     setLoadingMessages(true);
-    setSendError(null);
+    setFailedMessage(null);
+    setHasNewMessagesBelow(false);
+    isNearBottomRef.current = true;
+
     api.getMessages(selectedConvId)
       .then((history) => {
         setMessages(history);
+        requestAnimationFrame(() => {
+          scrollToBottom('instant');
+        });
       })
       .catch((err) => {
         console.error('Failed to load messages:', err);
@@ -146,12 +218,7 @@ export default function ChatPage() {
       .finally(() => {
         setLoadingMessages(false);
       });
-  }, [selectedConvId]);
-
-  // Scroll to bottom whenever messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [selectedConvId, scrollToBottom]);
 
   // Send message handler
   async function handleSendMessage(e: FormEvent) {
@@ -160,11 +227,15 @@ export default function ChatPage() {
 
     const content = messageInput.trim();
     setSending(true);
-    setSendError(null);
+    setFailedMessage(null);
 
     const socket = getSocket();
     if (!socket || !socket.connected) {
-      setSendError('Realtime connection unavailable. Please wait...');
+      setFailedMessage({
+        conversationId: selectedConvId,
+        content,
+        error: 'Realtime connection is offline. Reconnecting...',
+      });
       setSending(false);
       return;
     }
@@ -175,7 +246,11 @@ export default function ChatPage() {
       (ack: { ok: true; message: Message } | { ok: false; error: string }) => {
         setSending(false);
         if (!ack.ok) {
-          setSendError(ack.error || 'Failed to send message');
+          setFailedMessage({
+            conversationId: selectedConvId,
+            content,
+            error: ack.error || 'Failed to send message',
+          });
           return;
         }
 
@@ -185,9 +260,64 @@ export default function ChatPage() {
           return [...prev, ack.message];
         });
 
+        // Always smoothly scroll to bottom for user's own sent message
+        requestAnimationFrame(() => scrollToBottom('smooth'));
+
         // Bump conversation in sidebar
         setConversations((prev) => {
           const targetIndex = prev.findIndex((c) => c.id === selectedConvId);
+          if (targetIndex >= 0) {
+            const updated = { ...prev[targetIndex], last_message: ack.message };
+            const rest = prev.filter((_, i) => i !== targetIndex);
+            return [updated, ...rest];
+          }
+          return prev;
+        });
+      }
+    );
+  }
+
+  // Retry sending a previously failed message
+  function handleRetryFailedMessage() {
+    if (!failedMessage || sending) return;
+    const { conversationId, content } = failedMessage;
+    setSending(true);
+    setFailedMessage(null);
+
+    const socket = getSocket();
+    if (!socket || !socket.connected) {
+      setFailedMessage({
+        conversationId,
+        content,
+        error: 'Realtime connection is offline. Reconnecting...',
+      });
+      setSending(false);
+      return;
+    }
+
+    socket.emit(
+      'message:send',
+      { conversation_id: conversationId, content },
+      (ack: { ok: true; message: Message } | { ok: false; error: string }) => {
+        setSending(false);
+        if (!ack.ok) {
+          setFailedMessage({
+            conversationId,
+            content,
+            error: ack.error || 'Failed to send message',
+          });
+          return;
+        }
+
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === ack.message.id)) return prev;
+          return [...prev, ack.message];
+        });
+
+        requestAnimationFrame(() => scrollToBottom('smooth'));
+
+        setConversations((prev) => {
+          const targetIndex = prev.findIndex((c) => c.id === conversationId);
           if (targetIndex >= 0) {
             const updated = { ...prev[targetIndex], last_message: ack.message };
             const rest = prev.filter((_, i) => i !== targetIndex);
@@ -251,12 +381,41 @@ export default function ChatPage() {
     router.replace('/login');
   }
 
-  if (loading && !currentUser) {
+  // Skeleton Loading Layout for Initial App Load
+  if (initialLoading && !currentUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] text-[#202734]/60">
-        <div className="flex items-center gap-2.5 text-xs font-mono">
-          <span className="w-2 h-2 rounded-full bg-[#5D866C] animate-pulse" />
-          <span>Connecting session...</span>
+      <div className="h-screen bg-[#F5F5F0] text-[#202734] flex flex-col overflow-hidden">
+        {/* Skeleton Top Bar */}
+        <header className="h-14 border-b border-[#202734]/10 px-4 sm:px-6 flex items-center justify-between bg-white/70 backdrop-blur-md shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-md bg-[#5D866C]/30 animate-pulse" />
+            <div className="w-24 h-4 bg-black/5 rounded animate-pulse" />
+          </div>
+          <div className="w-24 h-7 rounded-full bg-black/5 animate-pulse" />
+        </header>
+
+        {/* Skeleton Two-Column Layout */}
+        <div className="flex-1 flex overflow-hidden">
+          <aside className="w-full md:w-80 lg:w-96 border-r border-[#202734]/10 bg-white flex flex-col shrink-0 p-3 space-y-3">
+            <div className="h-8 bg-black/5 rounded-lg animate-pulse" />
+            <div className="space-y-3 pt-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-3 p-2 rounded-lg animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-black/5 shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="w-24 h-3 bg-black/5 rounded" />
+                    <div className="w-36 h-2 bg-black/5 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+          <main className="hidden md:flex flex-1 bg-[#F5F5F0] items-center justify-center text-[#202734]/50 text-xs">
+            <div className="flex items-center gap-2 font-mono">
+              <span className="w-2 h-2 rounded-full bg-[#5D866C] animate-pulse" />
+              <span>Connecting session...</span>
+            </div>
+          </main>
         </div>
       </div>
     );
@@ -269,7 +428,7 @@ export default function ChatPage() {
   return (
     <div className="h-screen bg-[#F5F5F0] text-[#202734] flex flex-col overflow-hidden">
       {/* Top Application Bar */}
-      <header className="h-14 border-b border-[#202734]/10 px-4 sm:px-6 flex items-center justify-between bg-white/70 backdrop-blur-md shrink-0 z-20">
+      <header className="h-14 border-b border-[#202734]/10 px-3 sm:px-6 flex items-center justify-between bg-white/70 backdrop-blur-md shrink-0 z-20">
         <div className="flex items-center gap-2.5">
           <div className="w-6 h-6 rounded-md bg-[#5D866C] flex items-center justify-center text-[#F5F5F0] shadow-xs shrink-0">
             <svg
@@ -287,15 +446,25 @@ export default function ChatPage() {
               <path d="M8 13h5" />
             </svg>
           </div>
-          <span className="font-semibold text-sm text-[#202734] tracking-tight">DM Messenger</span>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm text-[#202734] tracking-tight">DM Messenger</span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                connectionState === 'connected'
+                  ? 'bg-[#5D866C]'
+                  : 'bg-amber-500 animate-pulse'
+              }`}
+              title={connectionState === 'connected' ? 'Connected' : 'Reconnecting...'}
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/profile"
-            className="flex items-center gap-2 pl-3 py-1 pr-1.5 rounded-full bg-white border border-[#202734]/10 hover:border-[#5D866C]/40 transition shadow-2xs group"
+            className="flex items-center gap-1.5 sm:gap-2 pl-2 sm:pl-3 py-1 pr-1 sm:pr-1.5 rounded-full bg-white border border-[#202734]/10 hover:border-[#5D866C]/40 transition shadow-2xs group"
           >
-            <span className="text-xs text-[#202734] font-medium group-hover:text-[#5D866C] transition-colors">
+            <span className="text-xs text-[#202734] font-medium group-hover:text-[#5D866C] transition-colors max-w-[85px] xs:max-w-[120px] sm:max-w-[160px] truncate">
               {currentDisplayName}
             </span>
             {currentUser && <Avatar user={currentUser} size="sm" />}
@@ -303,19 +472,46 @@ export default function ChatPage() {
 
           <Link
             href="/profile"
-            className="text-xs text-[#202734]/70 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition font-medium"
+            className="hidden sm:inline-block text-xs text-[#202734]/70 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition font-medium"
           >
             Profile
           </Link>
 
           <button
             onClick={handleLogout}
-            className="text-xs text-[#202734]/60 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition"
+            className="text-xs text-[#202734]/60 hover:text-[#202734] px-2 sm:px-2.5 py-1.5 rounded-md hover:bg-black/5 transition cursor-pointer"
           >
             Sign out
           </button>
         </div>
       </header>
+
+      {/* Realtime Disconnect / Reconnection Banner */}
+      {connectionState !== 'connected' && (
+        <div
+          role="status"
+          className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-xs font-medium text-amber-900 flex items-center justify-between z-30 shrink-0 transition-all"
+        >
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <span>
+              {connectionState === 'reconnecting'
+                ? 'Reconnecting to realtime messenger...'
+                : 'Disconnected from realtime server. Retrying...'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const s = getSocket();
+              if (s) s.connect();
+            }}
+            className="text-[11px] underline font-medium hover:text-amber-950 px-1.5 py-0.5 rounded hover:bg-amber-500/10 transition cursor-pointer"
+          >
+            Retry now
+          </button>
+        </div>
+      )}
 
       {/* Main Two-Column Messenger Body */}
       <div className="flex-1 flex overflow-hidden">
@@ -333,7 +529,7 @@ export default function ChatPage() {
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search username to chat..."
-                className="w-full pl-8 pr-3 py-1.5 bg-[#F5F5F0] border border-[#202734]/10 rounded-lg text-xs text-[#202734] placeholder:text-[#202734]/40 focus:bg-white focus:outline-none focus:border-[#5D866C] focus:ring-1 focus:ring-[#5D866C] transition"
+                className="w-full pl-8 pr-7 py-1.5 bg-[#F5F5F0] border border-[#202734]/10 rounded-lg text-xs text-[#202734] placeholder:text-[#202734]/40 focus:bg-white focus:outline-none focus:border-[#5D866C] focus:ring-1 focus:ring-[#5D866C] transition"
               />
               <svg
                 className="w-3.5 h-3.5 text-[#202734]/40 absolute left-2.5 top-2.5 pointer-events-none"
@@ -345,8 +541,10 @@ export default function ChatPage() {
               </svg>
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => handleSearchChange('')}
-                  className="absolute right-2.5 top-2.5 text-[#202734]/40 hover:text-[#202734] text-xs"
+                  className="absolute right-2.5 top-2.5 text-[#202734]/40 hover:text-[#202734] text-xs cursor-pointer"
+                  aria-label="Clear search"
                 >
                   ✕
                 </button>
@@ -357,17 +555,23 @@ export default function ChatPage() {
             {searchQuery.trim() !== '' && (
               <div className="mt-2 bg-white border border-[#202734]/10 rounded-xl shadow-lg overflow-hidden divide-y divide-[#202734]/5">
                 {searching && (
-                  <div className="p-3 text-xs text-[#202734]/50 text-center">Searching...</div>
+                  <div className="p-3.5 flex items-center justify-center gap-2 text-xs text-[#202734]/60">
+                    <span className="w-3 h-3 border-2 border-[#5D866C]/30 border-t-[#5D866C] rounded-full animate-spin" />
+                    <span>Searching users...</span>
+                  </div>
                 )}
                 {!searching && searchResults.length === 0 && (
-                  <div className="p-3 text-xs text-[#202734]/50 text-center">No users found</div>
+                  <div className="p-4 text-xs text-[#202734]/60 text-center flex flex-col items-center gap-1">
+                    <span className="text-[#202734]/40 font-mono text-[11px]">No users found</span>
+                    <span className="text-[11px] text-[#202734]/50">No match for &ldquo;{searchQuery.trim()}&rdquo;</span>
+                  </div>
                 )}
                 {!searching &&
                   searchResults.map((user) => (
                     <button
                       key={user.id}
                       onClick={() => handleOpenConversation(user.username)}
-                      className="w-full p-2.5 flex items-center gap-2.5 hover:bg-[#F5F5F0] text-left transition"
+                      className="w-full p-2.5 flex items-center gap-2.5 hover:bg-[#F5F5F0] text-left transition cursor-pointer"
                     >
                       <Avatar user={user} size="sm" />
                       <div className="flex-1 min-w-0">
@@ -390,11 +594,16 @@ export default function ChatPage() {
           {/* Conversation List */}
           <div className="flex-1 overflow-y-auto divide-y divide-[#202734]/5">
             {conversations.length === 0 ? (
-              <div className="p-6 text-center text-[#202734]/50 text-xs leading-relaxed">
-                <div className="w-9 h-9 rounded-full bg-[#202734]/5 flex items-center justify-center mx-auto mb-2 text-[#202734]/40">
-                  💬
+              <div className="p-8 text-center text-[#202734]/60 text-xs flex flex-col items-center justify-center h-full">
+                <div className="w-12 h-12 rounded-2xl bg-[#5D866C]/10 border border-[#5D866C]/20 flex items-center justify-center text-[#5D866C] mb-3">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
                 </div>
-                No conversations yet.<br />Search for a username above to start chatting.
+                <h4 className="font-semibold text-sm text-[#202734] mb-1">No conversations yet</h4>
+                <p className="max-w-xs text-[#202734]/60 leading-relaxed mb-1">
+                  Type a username in the search bar above to start your first direct conversation.
+                </p>
               </div>
             ) : (
               conversations.map((conv) => {
@@ -406,7 +615,7 @@ export default function ChatPage() {
                   <button
                     key={conv.id}
                     onClick={() => setSelectedConvId(conv.id)}
-                    className={`w-full p-3 flex items-center gap-3 text-left transition border-l-2 ${
+                    className={`w-full p-3 flex items-center gap-3 text-left transition border-l-2 cursor-pointer ${
                       isActive
                         ? 'bg-[#5D866C]/10 border-[#5D866C]'
                         : 'border-transparent hover:bg-[#F5F5F0]/80'
@@ -442,20 +651,24 @@ export default function ChatPage() {
           }`}
         >
           {selectedConversation ? (
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col overflow-hidden">
               {/* Conversation Header */}
-              <div className="h-14 border-b border-[#202734]/10 bg-white px-4 sm:px-6 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
+              <div className="h-14 border-b border-[#202734]/10 bg-white px-3 sm:px-6 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <button
+                    type="button"
                     onClick={() => setSelectedConvId(null)}
-                    className="md:hidden text-xs text-[#202734]/70 p-1.5 rounded-md hover:bg-black/5"
+                    className="md:hidden text-xs text-[#202734]/70 p-1.5 -ml-1 rounded-lg hover:bg-black/5 flex items-center gap-1 transition cursor-pointer"
                     aria-label="Back to conversations"
                   >
-                    ←
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span className="text-[11px] font-medium hidden sm:inline">Back</span>
                   </button>
                   <Avatar user={selectedConversation.peer} size="sm" />
                   <div>
-                    <h2 className="text-xs font-semibold text-[#202734]">
+                    <h2 className="text-xs font-semibold text-[#202734] leading-tight">
                       {getDisplayName(selectedConversation.peer)}
                     </h2>
                     {isPeerDeleted ? (
@@ -472,9 +685,13 @@ export default function ChatPage() {
               </div>
 
               {/* Message History & Live Feed */}
-              <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-3">
+              <div
+                ref={messagesContainerRef}
+                onScroll={handleContainerScroll}
+                className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-3 relative flex flex-col"
+              >
                 {/* Compact Left-Aligned Peer Info Card */}
-                <div className="p-3 bg-white border border-[#202734]/10 rounded-xl mb-4 flex items-center gap-3.5 shadow-[0_1px_3px_rgba(32,39,52,0.03)]">
+                <div className="p-3 bg-white border border-[#202734]/10 rounded-xl mb-3 flex items-center gap-3.5 shadow-[0_1px_3px_rgba(32,39,52,0.03)] shrink-0">
                   <Avatar user={selectedConversation.peer} size="lg" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -513,8 +730,34 @@ export default function ChatPage() {
                 </div>
 
                 {loadingMessages ? (
-                  <div className="text-center py-6 text-xs text-[#202734]/50 font-mono">
-                    Loading messages...
+                  /* Loading Message History Skeletons */
+                  <div className="space-y-4 py-2">
+                    <div className="flex items-end gap-2 max-w-sm">
+                      <div className="w-6 h-6 rounded-full bg-black/5 animate-pulse shrink-0" />
+                      <div className="w-48 h-9 rounded-2xl rounded-tl-xs bg-white border border-[#202734]/10 animate-pulse" />
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className="w-56 h-9 rounded-2xl rounded-tr-xs bg-[#5D866C]/20 animate-pulse" />
+                    </div>
+                    <div className="flex items-end gap-2 max-w-sm">
+                      <div className="w-6 h-6 rounded-full bg-black/5 animate-pulse shrink-0" />
+                      <div className="w-40 h-9 rounded-2xl rounded-tl-xs bg-white border border-[#202734]/10 animate-pulse" />
+                    </div>
+                  </div>
+                ) : messages.length === 0 ? (
+                  /* Empty Conversation Thread */
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-[#202734]/60 my-auto">
+                    <div className="w-12 h-12 rounded-2xl bg-white border border-[#202734]/10 flex items-center justify-center text-[#5D866C] mb-3 shadow-2xs">
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                    </div>
+                    <h4 className="font-semibold text-sm text-[#202734] mb-1">No messages here yet</h4>
+                    <p className="text-xs text-[#202734]/60 max-w-xs leading-relaxed">
+                      {isPeerDeleted
+                        ? 'This conversation was opened with a deleted user. No messages were ever exchanged.'
+                        : `This is the start of your direct conversation with ${getDisplayName(selectedConversation.peer)}. Say hello!`}
+                    </p>
                   </div>
                 ) : (
                   messages.map((msg) => {
@@ -563,16 +806,57 @@ export default function ChatPage() {
                     );
                   })
                 )}
-                <div ref={messagesEndRef} />
-              </div>
 
-              {/* Message Send Form */}
-              <div className="p-3 bg-white border-t border-[#202734]/10 shrink-0">
-                {sendError && (
-                  <div className="mb-2 px-3 py-1.5 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-xs">
-                    {sendError}
+                {/* Floating "New Messages" Pill when scrolled up */}
+                {hasNewMessagesBelow && (
+                  <div className="sticky bottom-2 flex justify-center z-20 pointer-events-none mt-auto">
+                    <button
+                      type="button"
+                      onClick={() => scrollToBottom('smooth')}
+                      className="pointer-events-auto bg-[#202734] hover:bg-[#202734]/90 text-[#F5F5F0] text-xs font-medium py-1.5 px-3.5 rounded-full shadow-md flex items-center gap-1.5 transition animate-in fade-in slide-in-from-bottom-2 duration-150 cursor-pointer"
+                    >
+                      <span>New messages</span>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </button>
                   </div>
                 )}
+              </div>
+
+              {/* Message Send Form & Delivery Error Banner */}
+              <div className="p-2.5 sm:p-3 bg-white border-t border-[#202734]/10 shrink-0">
+                {failedMessage && failedMessage.conversationId === selectedConvId && (
+                  <div
+                    role="alert"
+                    className="mb-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-150"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <svg className="w-4 h-4 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="truncate">Delivery failed: {failedMessage.error}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleRetryFailedMessage}
+                        className="px-2 py-1 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded font-medium text-[11px] transition shadow-xs cursor-pointer"
+                      >
+                        Retry
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFailedMessage(null)}
+                        className="text-rose-600 hover:text-rose-900 text-xs px-1 cursor-pointer"
+                        aria-label="Dismiss error"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                   <input
                     type="text"
@@ -590,7 +874,7 @@ export default function ChatPage() {
                   <button
                     type="submit"
                     disabled={isPeerDeleted || sending || !messageInput.trim()}
-                    className="px-4 py-2 bg-[#5D866C] hover:bg-[#4d705a] active:bg-[#41604c] disabled:opacity-40 disabled:cursor-not-allowed text-[#F5F5F0] text-xs font-medium rounded-lg transition shadow-xs shrink-0 flex items-center gap-1.5"
+                    className="px-4 py-2 bg-[#5D866C] hover:bg-[#4d705a] active:bg-[#41604c] disabled:opacity-40 disabled:cursor-not-allowed text-[#F5F5F0] text-xs font-medium rounded-lg transition shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer"
                   >
                     {sending ? (
                       <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -607,7 +891,7 @@ export default function ChatPage() {
                 ✉
               </div>
               <h3 className="text-sm font-semibold text-[#202734]">No conversation selected</h3>
-              <p className="text-xs text-[#202734]/60 mt-1 max-w-xs">
+              <p className="text-xs text-[#202734]/60 mt-1 max-w-xs leading-relaxed">
                 Pick a conversation from the sidebar or search for someone by username to start chatting.
               </p>
             </div>

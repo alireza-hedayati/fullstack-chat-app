@@ -177,11 +177,11 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-[#F5F5F0] text-[#202734] flex flex-col">
       {/* Top Application Bar */}
-      <header className="h-14 border-b border-[#202734]/10 px-6 flex items-center justify-between bg-white/70 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-4">
+      <header className="h-14 border-b border-[#202734]/10 px-4 sm:px-6 flex items-center justify-between bg-white/70 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Link
             href="/chat"
-            className="flex items-center gap-1.5 text-xs font-medium text-[#202734]/70 hover:text-[#202734] px-2.5 py-1.5 rounded-lg hover:bg-black/5 transition"
+            className="flex items-center gap-1.5 text-xs font-medium text-[#202734]/70 hover:text-[#202734] px-2 py-1.5 rounded-lg hover:bg-black/5 transition"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -194,15 +194,15 @@ export default function ProfilePage() {
 
         <button
           onClick={handleLogout}
-          className="text-xs text-[#202734]/60 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition"
+          className="text-xs text-[#202734]/60 hover:text-[#202734] px-2.5 py-1.5 rounded-md hover:bg-black/5 transition cursor-pointer"
         >
           Sign out
         </button>
       </header>
 
       {/* Main Form Layout */}
-      <main className="flex-1 max-w-xl w-full mx-auto p-6 flex flex-col justify-center">
-        <div className="bg-white border border-[#202734]/10 rounded-2xl p-8 shadow-[0_2px_12px_rgba(32,39,52,0.04)]">
+      <main className="flex-1 max-w-xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center">
+        <div className="bg-white border border-[#202734]/10 rounded-2xl p-5 sm:p-8 shadow-[0_2px_12px_rgba(32,39,52,0.04)]">
           {/* Identity Live Preview Hero */}
           <div className="flex flex-col items-center text-center pb-6 mb-6 border-b border-[#202734]/10">
             <Avatar user={previewUser} size="xl" className="mb-3" />

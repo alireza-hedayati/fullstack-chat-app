@@ -10,6 +10,11 @@ Append-only. One entry per finished feature, newest at the top. Format:
 
 ---
 
+## 2026-11-13 — F6 Polish
+- Client UX: implemented auto-scroll with reading-history protection (no scroll-snatch when user is scrolled up, with floating "New messages ↓" pill), alternating message loading skeletons, and empty states for conversation list, user search, and fresh chat threads.
+- Realtime resilience: added live connection-state tracking (`connected`, `reconnecting`, `disconnected`) with top banner feedback, automatic history refetch on reconnect, and inline failed-send alert with one-click retry.
+- Responsive design: refined two-column layout down to 375px mobile viewports, touch-friendly navigation, and polished loading states adhering to the `#F5F5F0` / `#5D866C` / `#202734` palette.
+
 ## 2026-11-13 — F5 Delete account
 - Server: implemented `DELETE /api/me` with password verification, single atomic SQLite transaction anonymizing account (`deleted_at = datetime('now')`, `username = 'deleted#' || id`, profile fields blanked, `password_hash = ''`), force disconnection of active sockets in `user:<id>`, and rejection of message sending to conversations with deleted peers.
 - Client: added Danger Zone on `/profile` with password confirmation modal dialog; cleared local authentication, disconnected socket, and redirected to `/login` upon deletion; styled deleted peers in `/chat` as "Deleted User" with gray initials avatar (`DU`) and disabled message input.

@@ -1,34 +1,30 @@
 # current-task — The Single Active Task
 
 **Task:** F6 — Polish
-**Status:** not started
-**Spec:** see `features.md` → F6. Read `rules.md` and `frontend-design` before starting.
+**Status:** completed
+**Spec:** see `features.md` → F6.
 
-## Scope
+## Completed Work
 
-- Auto-scroll behavior (only scroll down when user is already near the bottom, otherwise show new message pill / don't snatch scroll)
-- Empty states (no conversations, empty message thread, no search results)
-- Loading states (skeleton / subtle pulse states for conversations, message history, user search)
-- Realtime connection-status indicator (e.g. connected / reconnecting banner or dot)
-- Failed-send feedback & retry handling
-- Consistent Tailwind design pass (palette alignment with `#F5F5F0`, `#5D866C`, and `#202734`)
-- Usable down to 375px mobile viewport width (smooth mobile sidebar / chat pane navigation)
+- Auto-scroll behavior: smooth scroll when near bottom, no scroll snatching when reading history, floating "New messages ↓" pill when new messages arrive.
+- Empty states: tailored empty state for conversation list, user search results, and fresh conversation threads.
+- Loading states: skeleton layout for initial load and message history (no layout jumps or unstyled flashes).
+- Realtime connection indicator: tracks `connected` / `reconnecting` / `disconnected` status with reconnect banner and automatic history refetch upon reconnecting.
+- Failed-send error banner with 1-click "Retry" and dismiss actions.
+- Responsive design: optimized for 375px mobile viewport with back button, compact padding, and touch-friendly controls.
+- Consistent `#F5F5F0`, `#5D866C`, and `#202734` palette alignment across all pages.
 
-## Out of scope
+## Checklist
 
-- Future features (typing indicators, presence, unread counters, group chats, etc.)
+- [x] Killing server shows disconnected / reconnecting state in UI; restart recovers
+- [x] Auto-scroll smoothly keeps to bottom on new messages if near bottom, doesn't snatch scroll if reading history
+- [x] Empty state for conversation list, search results, and empty chat thread
+- [x] Loading states clean with no layout jumps or unstyled flashes
+- [x] Failed message send clearly surfaces error feedback
+- [x] Responsive layout fully usable at 375px viewport width
+- [x] `cd server && npx tsc --noEmit` — clean
+- [x] `npm run build --prefix client` — clean
 
-## Checklist (verify before marking done)
+---
 
-- [ ] Killing server shows disconnected / reconnecting state in UI; restart recovers
-- [ ] Auto-scroll smoothly keeps to bottom on new messages if near bottom, doesn't snatch scroll if reading history
-- [ ] Empty state for conversation list, search results, and empty chat thread
-- [ ] Loading states clean with no layout jumps or unstyled flashes
-- [ ] Failed message send clearly surfaces error feedback
-- [ ] Responsive layout fully usable at 375px viewport width
-- [ ] `cd server && npx tsc --noEmit` — clean
-- [ ] `npm run build --prefix client` — clean
-
-## On completion
-
-Append entry to `done.md` → load Next task / mark complete → commit.
+*All roadmap features (F0 through F6) are completed. See `features.md` §Later for candidate future features.*
