@@ -17,13 +17,11 @@ export default function ChatPage() {
       return;
     }
 
-    // Initialize with cached user profile if present
     const cachedUser = getUser();
     if (cachedUser) {
       setUser(cachedUser);
     }
 
-    // Verify token with backend /api/me
     api.getMe()
       .then((freshUser) => {
         setUser(freshUser);
@@ -48,70 +46,67 @@ export default function ChatPage() {
 
   if (loading && !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-400">
-        <div className="flex items-center space-x-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
-          <span className="text-sm">Loading session...</span>
+      <div className="min-h-screen flex items-center justify-center bg-[#0b0f17] text-slate-400">
+        <div className="flex items-center gap-2.5 text-xs font-mono">
+          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          <span>Connecting session...</span>
         </div>
       </div>
     );
   }
 
+  const initials = user?.username ? user.username.slice(0, 2).toUpperCase() : 'DM';
   const displayName =
     user?.first_name || user?.last_name
       ? `${user.first_name} ${user.last_name}`.trim()
       : user?.username;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      {/* Top Navigation */}
-      <header className="h-16 border-b border-zinc-800 px-6 flex items-center justify-between bg-zinc-900/60 backdrop-blur">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold text-sm border border-indigo-500/30">
+    <div className="min-h-screen bg-[#0b0f17] text-slate-100 flex flex-col">
+      {/* Top Application Bar */}
+      <header className="h-14 border-b border-slate-800/80 px-6 flex items-center justify-between bg-[#0e131f]/60 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center font-bold text-[11px] text-white">
             DM
           </div>
-          <span className="font-semibold text-white tracking-tight">DM Messenger</span>
+          <span className="font-medium text-sm text-white tracking-tight">DM Messenger</span>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="text-right">
-            <div className="text-sm font-medium text-white">{displayName}</div>
-            <div className="text-xs text-zinc-400">@{user?.username}</div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 pl-3 py-1 pr-1.5 rounded-full bg-[#121826] border border-slate-800">
+            <span className="text-xs text-slate-300 font-medium">@{user?.username}</span>
+            <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 font-semibold text-[11px] flex items-center justify-center border border-blue-500/30">
+              {initials}
+            </div>
           </div>
           <button
             onClick={handleLogout}
-            className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg border border-zinc-700 transition"
+            className="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded transition-colors"
           >
-            Log out
+            Sign out
           </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-4xl w-full mx-auto p-6 flex flex-col justify-center items-center text-center">
-        <div className="max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-lg">
-          <div className="w-14 h-14 rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-            {user?.username.slice(0, 2).toUpperCase()}
+      {/* Main Container */}
+      <main className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm text-center">
+          <div className="w-16 h-16 rounded-2xl bg-blue-600/10 border border-blue-500/20 text-blue-400 font-semibold text-lg flex items-center justify-center mx-auto mb-4">
+            {initials}
           </div>
-          <h2 className="text-xl font-semibold text-white mb-1">
-            Welcome, {displayName}!
+          <h2 className="text-lg font-semibold text-white tracking-tight">
+            Signed in as {displayName}
           </h2>
-          <p className="text-sm text-zinc-400 mb-6">
-            Authentication is verified. Your session is active and persists across reloads.
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+            Your credentials and session are verified. Realtime conversations and profiles unlock in the next steps.
           </p>
 
-          <div className="text-left text-xs bg-zinc-950 rounded-xl p-4 border border-zinc-800/80 space-y-1.5 text-zinc-400">
-            <div><span className="text-zinc-500">User ID:</span> {user?.id}</div>
-            <div><span className="text-zinc-500">Username:</span> {user?.username}</div>
-            <div><span className="text-zinc-500">Status:</span> Active</div>
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-zinc-800/80">
+          <div className="mt-6 pt-6 border-t border-slate-800/80">
             <button
               onClick={handleLogout}
-              className="w-full py-2 px-4 bg-zinc-800 hover:bg-rose-950 hover:text-rose-400 hover:border-rose-800 text-zinc-300 font-medium text-xs rounded-lg border border-zinc-700 transition"
+              className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-[#121826] hover:bg-[#182032] border border-slate-800 rounded-md transition-colors"
             >
-              Sign out of {user?.username}
+              Sign out of account
             </button>
           </div>
         </div>

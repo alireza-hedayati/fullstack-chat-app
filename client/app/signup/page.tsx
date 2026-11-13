@@ -11,7 +11,7 @@ export default function SignupPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated()) {
@@ -25,7 +25,7 @@ export default function SignupPage() {
 
     const trimmedUsername = username.trim();
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(trimmedUsername)) {
-      setError('Username must be 3–20 characters and contain only letters, numbers, and underscores.');
+      setError('Username must be 3–20 characters and contain only letters, numbers, or underscores.');
       return;
     }
 
@@ -34,7 +34,7 @@ export default function SignupPage() {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
 
     try {
       const response = await api.signup({ username: trimmedUsername, password });
@@ -46,86 +46,99 @@ export default function SignupPage() {
       } else if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('An unexpected error occurred. Please try again.');
+        setError('Unable to create account. Please try again.');
       }
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-zinc-950 text-zinc-100">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl">
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600/10 text-indigo-400 font-bold text-xl mb-3 border border-indigo-500/20">
-            DM
+    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12">
+      <div className="w-full max-w-[380px]">
+        {/* Brand identity header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center font-bold text-xs text-white tracking-tight shadow-sm shadow-blue-500/20">
+              DM
+            </div>
+            <span className="text-sm font-semibold tracking-tight text-white">DM Messenger</span>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">Create an account</h1>
-          <p className="text-sm text-zinc-400 mt-1">Start chatting in real time with anyone</p>
+          <h1 className="text-xl font-semibold text-white tracking-tight">Create your account</h1>
+          <p className="text-xs text-slate-400 mt-1">Start chatting with anyone directly by username</p>
         </div>
 
+        {/* Error notification */}
         {error && (
-          <div className="mb-6 p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>{error}</span>
+          <div
+            role="alert"
+            className="mb-5 p-3 rounded-md bg-rose-950/40 border border-rose-800/60 text-rose-200 text-xs leading-relaxed"
+          >
+            {error}
           </div>
         )}
 
+        {/* Auth form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5 uppercase tracking-wider">
-              Username
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="username" className="block text-xs font-medium text-slate-300">
+                Username
+              </label>
+              <span className="text-[11px] text-slate-500">3–20 chars, a–z, 0–9, _</span>
+            </div>
             <input
+              id="username"
               type="text"
               required
+              autoFocus
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="3–20 characters (letters, numbers, _)"
-              className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              placeholder="e.g. alex"
+              className="w-full px-3 py-2 bg-[#121826] border border-slate-800 rounded-md text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5 uppercase tracking-wider">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="password" className="block text-xs font-medium text-slate-300">
+                Password
+              </label>
+              <span className="text-[11px] text-slate-500">Min 6 characters</span>
+            </div>
             <input
+              id="password"
               type="password"
               required
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 6 characters"
-              className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              placeholder="••••••••"
+              className="w-full px-3 py-2 bg-[#121826] border border-slate-800 rounded-md text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
             />
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full mt-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg transition duration-150 flex items-center justify-center shadow-sm"
+            disabled={submitting}
+            className="w-full mt-2 py-2 px-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-50 text-white font-medium text-sm rounded-md transition-colors shadow-sm"
           >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Creating account...
-              </span>
-            ) : (
-              'Create account'
-            )}
+            {submitting ? 'Creating account...' : 'Create account'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-400">
-          Already have an account?{' '}
-          <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-medium underline-offset-4 hover:underline">
-            Sign in
-          </Link>
-        </p>
+        <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
+          <p className="text-xs text-slate-400">
+            Already registered?{' '}
+            <Link
+              href="/login"
+              className="text-blue-400 hover:text-blue-300 font-medium underline-offset-4 hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
